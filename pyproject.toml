@@ -1,0 +1,29 @@
+[project]
+name = "researchmap"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "rsimd", email = "rickysimd@gmail.com" }
+]
+dependencies = [
+    "ipython>=8.30.0",
+    "jupyter>=1.1.1",
+    "numpy>=2.2.0",
+    "pandas>=2.2.3",
+    "tqdm>=4.67.1",
+    "matplotlib>=3.10.0",
+    "webdriver-manager>=4.0.2",
+    "selenium>=4.27.1",
+]
+readme = "README.md"
+requires-python = ">= 3.10"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/researchmap"]
