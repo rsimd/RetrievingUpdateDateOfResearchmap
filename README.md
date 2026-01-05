@@ -12,7 +12,7 @@ Researchmap（日本の研究者情報データベース）から、指定され
 
 - Python 3.10以上
 - Chromeブラウザ（Seleniumで使用）
-- uv（パッケージ管理ツール）
+- [uv](https://docs.astral.sh/uv/#installation)（パッケージ管理ツール）
 
 ## インストール
 
