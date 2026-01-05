@@ -46,6 +46,9 @@ mv /tmp/chromedriver /usr/local/bin/chromedriver
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 from bs4 import BeautifulSoup
@@ -54,6 +57,7 @@ from datetime import datetime
 from tqdm import tqdm, trange
 import argparse
 from pathlib import Path
+import re
 
 def get_pages(url, interval=5):
     # Chromeのオプションを設定
@@ -68,11 +72,28 @@ def get_pages(url, interval=5):
     # ブラウザを起動
     driver = webdriver.Chrome(service=service, options=chrome_options)
     
-    # URLにアクセス
-    driver.get(url)
-    page_source = driver.page_source
-    time.sleep(interval)
-    driver.quit()
+    try:
+        # URLにアクセス
+        driver.get(url)
+        
+        # ページが完全に読み込まれるまで待機
+        # まずは基本的な待機時間を設ける
+        time.sleep(interval)
+        
+        # 可能であれば、body要素が存在することを確認
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+        except:
+            # タイムアウトしても続行（フォールバック）
+            pass
+        
+        # ページソースを取得
+        page_source = driver.page_source
+    finally:
+        driver.quit()
+    
     return page_source
 
 def get_researchers(page_src:str)->pd.DataFrame:
@@ -101,14 +122,40 @@ def get_researchers(page_src:str)->pd.DataFrame:
 
 def get_update_date(page_src:str)->str:
     soup = BeautifulSoup(page_src, "html.parser")
-    elements = soup.find_all("div", attrs={"class":"rm-modified text-right"})
+    # 複数のクラス名を持つ要素を検索する場合は、CSSセレクタを使用
+    elements = soup.select("div.rm-modified.text-right")
     if not elements:
         # 要素が見つからない場合は空の文字列を返す．
         return ""
     element = elements[0]
-    date = element.text.strip().replace("更新日: ","")
-    if len(date.split("/")) == 2:
+    # テキストから余分な空白や改行、タブを削除
+    text = element.get_text(separator=" ", strip=True)
+    # タブ文字や連続する空白を単一の空白に置換
+    text = re.sub(r'\s+', ' ', text)
+    
+    # "更新日: "を削除（前後の空白も考慮）
+    date = re.sub(r"更新日\s*:\s*", "", text, flags=re.IGNORECASE)
+    # 全ての空白文字（スペース、タブ、改行など）を削除
+    date = re.sub(r'\s+', '', date)
+    
+    # 日付の形式をチェック（YYYY/MM/DD または MM/DD）
+    if not date:
+        return ""
+    
+    # hh:mm形式（当日更新）の場合は今日の日付を返す
+    if re.match(r"^\d{1,2}:\d{1,2}$", date):
+        return datetime.today().strftime('%Y/%m/%d')
+    
+    # MM/DD形式の場合は年を追加
+    if re.match(r"^\d{1,2}/\d{1,2}$", date):
         date = f"{datetime.today().year}/{date}"
+    # YYYY/MM/DD形式の場合はそのまま返す
+    elif re.match(r"^\d{4}/\d{1,2}/\d{1,2}$", date):
+        pass
+    else:
+        # その他の形式の場合は空文字列を返す
+        return ""
+    
     return date
 
 def parse_args():
@@ -119,6 +166,7 @@ def parse_args():
 
 if __name__ == "__main__":
     ## Researchmapからhtml収集
+    
     args = parse_args()
     url = f"https://researchmap.jp/researchers?institution_code={args.institution_code}&limit={args.limit}"
     page_source = get_pages(url)
@@ -129,6 +177,9 @@ if __name__ == "__main__":
         print(f"loading about {name}")
         tmp += [get_pages(url, interval=10)]
     df["pages"] = tmp
+    """
+    df = pd.read_pickle("results/df_2026年01月05日.pickle")
+    """
     ### 研究者ごとにhtmlを解析し，更新日を取得
     dates = []
     for ix in trange(df.shape[0]):
