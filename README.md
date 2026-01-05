@@ -1,4 +1,4 @@
-# researchmap
+# Retrieving update date of Researchmap
 
 Researchmap（日本の研究者情報データベース）から、指定された組織に所属する研究者のページ更新日を取得するツールです。
 
